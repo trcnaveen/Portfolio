@@ -1,0 +1,73 @@
+name: Build and Deploy React App (portfolio)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # 3. Install dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # 4. Build React app
+      - name: Build project
+        run: npm run build
+
+      # 5. Copy build to EC2
+      - name: Copy build to EC2
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "dist/*"
+          target: "/home/ec2-user/appdata/portfolio/dist_new"
+
+      # 6. Backup old dist, move new build, set permissions, reload Nginx
+      - name: Deploy build on EC2
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            DEPLOY_DIR="/home/ec2-user/appdata/portfolio/dist"
+            NEW_BUILD="/home/ec2-user/appdata/portfolio/dist_new"
+            BACKUP_DIR="/home/ec2-user/appdata/portfolio/dist_backup_$(date +%F_%H-%M-%S)"
+            BACKUP_BASE="/home/ec2-user/appdata/portfolio"
+            
+            # Backup current build
+            if [ -d "$DEPLOY_DIR" ]; then
+              mv "$DEPLOY_DIR" "$BACKUP_DIR"
+            fi
+
+            # Create deploy directory if not exists
+            mkdir -p "$DEPLOY_DIR"
+
+            # Move new build into place
+            mv "$NEW_BUILD"/* "$DEPLOY_DIR"
+            rm -rf "$NEW_BUILD"
+
+            # Keep only the most recent backup, delete older ones
+            cd "$BACKUP_BASE"
+            ls -dt dist_backup_* | tail -n +2 | xargs -r rm -rf
+
+            # Reload Nginx
+            sudo systemctl reload nginx
