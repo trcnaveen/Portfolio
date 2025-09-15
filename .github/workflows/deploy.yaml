@@ -36,8 +36,8 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          source: "dist/*"
-          target: "/home/ec2-user/appdata/portfolio/dist_new"
+          source: "dist"
+          target: "/home/ec2-user/appdata/portfolio/"
 
       # 6. Backup old dist, move new build, set permissions, reload Nginx
       - name: Deploy build on EC2
@@ -62,7 +62,7 @@ jobs:
             mkdir -p "$DEPLOY_DIR"
 
             # Move new build into place
-            mv "$NEW_BUILD"/* "$DEPLOY_DIR"
+            mv "$NEW_BUILD" "$DEPLOY_DIR"
             rm -rf "$NEW_BUILD"
 
             # Keep only the most recent backup, delete older ones
