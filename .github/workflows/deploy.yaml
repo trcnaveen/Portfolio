@@ -36,8 +36,8 @@ jobs:
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
-          source: "dist"
-          target: "/home/ec2-user/appdata/portfolio/"
+          source: "dist/*"
+          target: "/home/ec2-user/appdata/portfolio/dist_new"
 
       # 6. Backup old dist, move new build, set permissions, reload Nginx
       - name: Deploy build on EC2
@@ -52,6 +52,12 @@ jobs:
             NEW_BUILD="/home/ec2-user/appdata/portfolio/dist_new"
             BACKUP_DIR="/home/ec2-user/appdata/portfolio/dist_backup_$(date +%F_%H-%M-%S)"
             BACKUP_BASE="/home/ec2-user/appdata/portfolio"
+
+             # Ensure new build exists
+            if [ ! -d "$NEW_BUILD" ] || [ -z "$(ls -A "$NEW_BUILD")" ]; then
+              echo "Error: dist_new folder is missing or empty!"
+              exit 1
+            fi
             
             # Backup current build
             if [ -d "$DEPLOY_DIR" ]; then
@@ -62,7 +68,7 @@ jobs:
             mkdir -p "$DEPLOY_DIR"
 
             # Move new build into place
-            mv "$NEW_BUILD" "$DEPLOY_DIR"
+            mv "$NEW_BUILD"/* "$DEPLOY_DIR"
             rm -rf "$NEW_BUILD"
 
             # Keep only the most recent backup, delete older ones
